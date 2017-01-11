@@ -1,5 +1,7 @@
 #include <vector>
 #include <iostream>
+#include <chrono>
+#include <omp.h>
 
 using namespace std;
 
@@ -62,12 +64,22 @@ int main() {
    size_t numIterations = 0;
 
    cin >> numIterations;
-   cout << "Initial matrix:\n" << to_string(b) << "\n";
+   auto start = std::chrono::steady_clock::now();
+   double start2 = omp_get_wtime();
    for (size_t i = 0; i < numIterations; ++i) {
       b = std::move(oneIteration(b));
-      cout << "Iteration " << (i + 1) << "\n" << to_string(b) <<"\n";
-
    }
+   double end = omp_get_wtime() - start2;
+   auto duration = std::chrono::duration_cast<std::chrono::milliseconds> 
+                                   (std::chrono::steady_clock::now() - start);
+   auto durationS = std::chrono::duration_cast<std::chrono::seconds> 
+                                   (std::chrono::steady_clock::now() - start);
+
+
+
+   cout << to_string(b) << "\n";
+   cout << "omp_get_wtime: " << end << " seconds\n";
+   cout << numRows << ' ' << numCols << ' ' << M << " it took:  " << duration.count() << " milliseconds or " << durationS.count() << "\n";
 
    return 0;
 }

@@ -2,6 +2,7 @@
 #include <deque>
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include <boost/mpi.hpp>
 #include <boost/mpi/collectives.hpp>
 #include <boost/mpi/environment.hpp>
@@ -123,7 +124,7 @@ void doForLastProcess(mpi::communicator& world, Board& b, int rank) {
     reqs = world.isend(rank - 1, rank - 1, b[0]);
     world.recv(rank - 1, rank, firstRow);
 
-    b.insert(b.begin(), std::move(firstRow));
+    b.push_front(std::move(firstRow));
 
     doProcessing(b, 1, b.size());
 
@@ -139,7 +140,7 @@ void doForInBetweenProcess(mpi::communicator& world, Board& b, int rank) {
     world.recv(rank - 1, rank, firstRow);
     world.recv(rank + 1, rank, lastRow);
 
-    b.insert(b.begin(), std::move(firstRow));
+    b.push_front(std::move(firstRow));
     b.push_back(std::move(lastRow));
 
     doProcessing(b, 1, b.size() - 1);
@@ -152,6 +153,8 @@ void doForInBetweenProcess(mpi::communicator& world, Board& b, int rank) {
 int main() {
    mpi::environment env;
    mpi::communicator world;
+
+    auto start = std::chrono::steady_clock::now();
 
    Board local;
    size_t M;
@@ -200,6 +203,17 @@ int main() {
 
    if (world.rank() == root) {
        cout << result ;
+   }
+
+   auto duration = std::chrono::duration_cast<std::chrono::milliseconds> 
+                                   (std::chrono::steady_clock::now() - start);
+
+   result.clear();
+   string t = to_string(local.size()) + " " + to_string(local[0].size()) + " " + to_string(M) + " " + to_string(world.rank()) + " " + to_string(duration.count()) + "  milliseconds\n";
+   reduce(world, t, result, [] (string s, string t) {return s + t;}, root);
+
+   if (world.rank() == root) {
+       cout << result;
    }
 
    return 0;

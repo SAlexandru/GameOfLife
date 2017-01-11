@@ -1,0 +1,9 @@
+0 0 0 0 0 0 
+0 0 1 1 0 0 
+0 1 0 0 1 0 
+0 0 1 1 0 0 
+0 0 0 0 0 0 
+0 0 0 0 0 0 
+
+omp_get_wtime: 0.002275 seconds
+6 6 6 it took:  2 milliseconds or 0

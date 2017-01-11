@@ -1,3 +1,4 @@
+#include <chrono>
 #include <vector>
 #include <iostream>
 
@@ -45,7 +46,7 @@ string to_string(const Board& b) {
    return s;
 }
 
-int main() {
+int main(int argc, char** argv) {
    size_t M, numRows, numCols;
 
    cin >> numRows >> numCols >> M;
@@ -60,12 +61,15 @@ int main() {
    size_t numIterations = 0;
 
    cin >> numIterations;
-   cout << "Initial matrix:\n" << to_string(b) << "\n";
+
+   auto start = std::chrono::steady_clock::now();
    for (size_t i = 0; i < numIterations; ++i) {
       b = std::move(oneIteration(b));
-      cout << "Iteration " << (i + 1) << "\n" << to_string(b) <<"\n";
-
    }
+   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+
+   cout << to_string(b) << "\n";
+   cout << numRows << ' ' << numCols << ' ' << M << " it took:  " << duration.count() << " milliseconds\n";
 
    return 0;
 }
