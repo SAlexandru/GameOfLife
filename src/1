@@ -1,0 +1,175 @@
+#include <array>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <boost/mpi.hpp>
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+
+using namespace std;
+
+namespace mpi = boost::mpi;
+
+constexpr int root = 0; // root process
+constexpr int MAX_SIZE = 50000;
+
+using Board = vector<vector<bool>>;
+
+const int dx[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+const int dy[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+
+string to_string(const Board& b) {
+   string s = "";
+   for (const vector<bool>& line: b) {
+      for (const bool& cell: line) {
+	  s += cell ? "1 " : "0 ";
+      }
+      s += "\n";
+   }
+   return s;
+}
+
+Board transpose(const Board& b) {
+    if (b.empty()) {
+      return vector<vector<bool>> (0, vector<bool>(0));
+    }
+
+    Board bt(b[0].size(), vector<bool>(b.size()));
+
+    for (size_t i = 0; i < b.size(); ++i) {
+        for (size_t j = 0; j < b[i].size(); ++j) {
+            bt[j][i] = b[i][j];
+        }
+    }
+
+    return bt;
+}
+
+
+Board partition(const Board& b, size_t start, size_t size ) {
+    if (size == 0) size = b.size();
+    int stop = std::min<size_t>(b.size(), start + size);
+
+    Board partitiondB;
+    partitiondB.reserve(size);
+    
+    for (int i = start; i < stop; ++i) {
+        partitiondB.push_back(b[i]);
+    }
+
+    return partitiondB;
+}
+
+Board partition(const Board& b, size_t start) {
+    Board partitiondB;
+    
+    for (size_t i = start; i < b.size(); ++i) {
+        partitiondB.push_back(b[i]);
+    }
+
+    return partitiondB;
+}
+
+void doForFirstProcess(mpi::communicator& world, Board& b) {
+    vector<bool> lastRow;
+    world.isend(1, root + 1, b.back());
+    world.recv(1, root, lastRow);
+
+    size_t numRows = b.size();
+    b.push_back(std::move(lastRow));
+
+
+    b.pop_back();
+}
+
+void doForLastProcess(mpi::communicator& world, Board& b, int rank) {
+    vector<bool> firstRow;
+    world.isend(rank - 1, rank - 1, b[0]);
+    world.recv(rank - 1, rank, firstRow);
+
+    size_t numRows = b.size();
+    b.insert(b.begin(), std::move(firstRow));
+
+    b.erase(b.begin());
+}
+
+void doForInBetweenProcess(mpi::communicator& world, Board& b, int rank) {
+    vector<bool> firstRow, lastRow;
+
+    world.isend(rank - 1, rank - 1, b[0]);
+    world.isend(rank + 1, rank + 1, b.back());
+    world.recv(rank - 1, rank, firstRow);
+    world.recv(rank + 1, rank, lastRow);
+
+    b.insert(b.begin(), std::move(firstRow));
+    b.push_back(std::move(lastRow));
+
+    b.erase(b.begin());
+    b.pop_back();
+}
+
+void doProcessing(Board& b, size_t start, size_t end) {
+
+    for (size_t i = start; i < end; ++i) {
+        for (size_t j = 0; j < b[i].size(); ++j) {
+
+        }
+    }
+}
+
+
+int main() {
+   mpi::environment env;
+   mpi::communicator world;
+
+   Board local;
+   size_t M;
+   
+   ofstream out{"output/out_" + to_string(world.rank()) + "_.out"};
+
+   if (root == world.rank()) {
+       size_t numRows, numCols, x, y;
+       cin >> numRows >> numCols >> M;
+       Board b;
+       b.resize(numRows);
+       for (size_t i = 0; i < numRows; ++i) {
+           b[i].resize(numCols);
+       }
+       for (size_t i = 0; i < M; ++i) {
+           cin >> x >> y;
+           b[x][y] = true;
+       }
+
+       const size_t numProcess = std::min<size_t>(numRows, world.size());
+       const size_t sizeOfAPartition = numRows / numProcess;
+
+       local = partition(b, 0, sizeOfAPartition);
+
+       for (size_t i = 1; i < numProcess - 1; ++i) {
+           world.send(i, root, partition(b, i * sizeOfAPartition, sizeOfAPartition));
+       }
+       world.send(numProcess - 1, root, partition (b, (numProcess - 1) * sizeOfAPartition));
+   }
+   else {
+       world.recv(root, root, local);
+   }
+
+   broadcast(world, M, root); 
+
+   world.barrier();
+
+   for (size_t i = 0; i < M; ++i) {
+       if (world.rank() == 0) doForFirstProcess(world, local);
+       else if (world.rank() == world.size() - 1) doForLastProcess(world, local, world.rank());
+       else doForInBetweenProcess(world, local, world.rank());
+   }
+
+   
+   return 0;
+}
+
+
